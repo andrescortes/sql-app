@@ -1,50 +1,45 @@
 package co.com.app;
 
-import co.com.app.dto.EmployeeDto;
-
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import co.com.app.conf.HibernateConf;
+import co.com.app.entity.DepartmentEntity;
+import co.com.app.entity.EmployeeEntity;
+import org.hibernate.Session;
+import org.hibernate.Transaction;
+import org.hibernate.query.Query;
 
 public class Main {
-    private static final Logger LOGGER = Logger.getLogger(Main.class.getName());
 
     public static void main(String[] args) {
-        final String jdbcUrl = "jdbc:h2:~/test;DB_CLOSE_DELAY=-1";
-        final String username = "sa";
-        final String password = "";
-        final String scriptPath = "src/main/resources/schema.sql";
-        final String query = "select e.id, e.name, e.email, e.department_id, d.name AS department_name from employees e join departments d on e.department_id = d.id";
+        try (Session session = HibernateConf.getSESSION_FACTORY().openSession()) {
+            Transaction transaction = session.beginTransaction();
+            DepartmentEntity department = DepartmentEntity.builder()
+                    .name("Lightweight")
+                    .build();
 
+            session.persist(department);
 
-        try (Connection connection = DriverManager.getConnection(jdbcUrl, username, password)) {
-            Statement statement = connection.createStatement();
-            boolean execute = statement.execute("RUNSCRIPT FROM '".concat(scriptPath).concat("'"));
-            System.out.println("Query result " + execute);
-            ResultSet resultSet = statement.executeQuery(query);
-            List<EmployeeDto> employeeDtos = new ArrayList<>();
-            while (resultSet.next()) {
-                EmployeeDto employeeDtoBuilder = EmployeeDto.builder()
-                        .id(resultSet.getInt("id"))
-                        .name(resultSet.getString("name"))
-                        .email(resultSet.getString("email"))
-                        .departmentId(resultSet.getInt("department_id"))
-                        .departmentName(resultSet.getString("department_name"))
-                        .build();
-                employeeDtos.add(employeeDtoBuilder);
-            }
-            employeeDtos.forEach(employee -> {
-                System.out.println("Employee: " + employee);
-                System.out.println();
+            EmployeeEntity employee = EmployeeEntity.builder()
+                    .name("Conor")
+                    .email("conor@gmail.com")
+                    .department(department)
+                    .build();
+            EmployeeEntity employee2 = EmployeeEntity.builder()
+                    .name("MacKellen")
+                    .email("mackellen@gmail.com")
+                    .department(department)
+                    .build();
+
+            session.persist(employee);
+            session.persist(employee2);
+            transaction.commit();
+
+            Query<EmployeeEntity> query = session.createQuery("FROM EmployeeEntity e join FETCH e.department", EmployeeEntity.class);
+
+            query.list().forEach(emp -> {
+                System.out.println("id: " + emp.getId());
+                System.out.println("name: " + emp.getName());
+                System.out.println("DepartmentName: " + emp.getDepartment().getName());
             });
-        } catch (SQLException e) {
-            LOGGER.log(Level.SEVERE, e.getMessage());
         }
     }
 }
